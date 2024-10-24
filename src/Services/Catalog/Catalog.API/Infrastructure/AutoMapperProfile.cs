@@ -10,7 +10,15 @@ public class AutoMapperProfile : Profile
     public AutoMapperProfile()
     {
         CreateMap<CreateProductRequest, CreateProductCommand>()
-            .ConstructUsing(x => new CreateProductCommand(x.Name, x.Categories, x.Description, x.ImageFile, x.Price));
+            .ConstructUsing(x => new CreateProductCommand(
+                new Product(
+                    Guid.Empty,
+                    x.Name,
+                    x.Categories,
+                    x.Description,
+                    x.ImageFile,
+                    x.Price
+                )));
 
         CreateMap<CreateProductResult, CreateProductResponse>();
 

@@ -1,4 +1,5 @@
-﻿using BuildingBlocks.Exceptions;
+﻿using System.Text.Json;
+using BuildingBlocks.Exceptions;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -11,16 +12,21 @@ namespace BuildingBlocks.Handlers
     {
         public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
         {
-            logger.LogError(exception, "An unhandled exception has occurred: {Message}. Time: {Time}", exception.Message, DateTime.UtcNow);
+            logger.LogError("[Error] {Message}", exception.Message);
 
             (string Details, string Title, int StatusCode) details = exception switch
             {
                 NotFoundException => (exception.Message, "Not Found", StatusCodes.Status404NotFound),
                 BedRequestException => (exception.Message, "Bad Request", StatusCodes.Status400BadRequest),
                 InternalServerException => (exception.Message, "Internal Server Error", StatusCodes.Status500InternalServerError),
-                ValidationException => (exception.Message, "Validation Error", StatusCodes.Status400BadRequest),
-                _ => ("An error occurred while processing your request.", "An error occurred", StatusCodes.Status500InternalServerError)
+                _ => ("An error occurred while processing your request.", "An error occurred", StatusCodes.Status500InternalServerError),
             };
+            if (exception is ValidationAppException validationAppException)
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await httpContext.Response.WriteAsJsonAsync(new { validationAppException.Errors }, cancellationToken);
+                return true;
+            }
 
             var problemDetails = new ProblemDetails
             {

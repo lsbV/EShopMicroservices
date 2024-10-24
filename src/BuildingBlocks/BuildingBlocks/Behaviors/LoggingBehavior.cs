@@ -10,7 +10,10 @@ namespace BuildingBlocks.Behaviors
     {
         public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
         {
-            logger.LogInformation("[Start] Handle request={Request} - Response={Response} RequestData={RequestData}", typeof(TRequest).Name, typeof(TResponse).Name, request);
+
+            logger.LogInformation(
+                "[Start] Handle request={RequestName} - Response={Response} RequestData={RequestData}",
+                typeof(TRequest).Name, typeof(TResponse).Name, request);
 
             var timer = new Stopwatch();
             timer.Start();
@@ -18,7 +21,8 @@ namespace BuildingBlocks.Behaviors
             var response = await next();
 
             timer.Stop();
-            logger.LogInformation("[End] Handle request={Request} - Response={Response} Elapsed={Elapsed}ms", typeof(TRequest).Name, typeof(TResponse).Name, timer.ElapsedMilliseconds);
+            logger.LogInformation("[End] Handle request={Request} - Response={Response} Elapsed={Elapsed}ms",
+                typeof(TRequest).Name, typeof(TResponse).Name, timer.ElapsedMilliseconds);
 
             return response;
         }
