@@ -1,18 +1,9 @@
 ﻿namespace Basket.API.Basket.GetBasket;
 
 public record GetBasketResponse(
-    string UserName,
-    List<BasketItemResponse> Items,
-    decimal TotalPrice
+    ShoppingCart Cart
 );
 
-public record BasketItemResponse(
-    uint Quantity,
-    string ProductName,
-    decimal Price,
-    string Color,
-    string ImageUrl
-);
 
 public sealed class GetBasketEndpoint
     : ICarterModule

@@ -1,3 +1,4 @@
+using Basket.API.Data;
 using BuildingBlocks.Behaviors;
 using BuildingBlocks.Handlers;
 using FluentValidation;
@@ -16,9 +17,37 @@ services.AddMediatR(config =>
     config.AddOpenBehavior(typeof(LoggingBehavior<,>));
     config.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
-services.AddHealthChecks();
+var databaseConnectionString = builder.Configuration.GetConnectionString("Database")
+    ?? throw new ArgumentException("Database connection string is required");
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
+    ?? throw new ArgumentException("Redis connection string is required");
+services.AddHealthChecks()
+    .AddNpgSql(databaseConnectionString)
+    .AddRedis(redisConnectionString);
+
 services.AddExceptionHandler<CustomExceptionHandler>();
 services.AddValidatorsFromAssembly(assembly);
+services.AddMarten(ops =>
+    {
+        ops.Connection(databaseConnectionString);
+        ops.Schema.For<ShoppingCart>().Identity(x => x.UserName);
+    })
+    .UseLightweightSessions();
+services.AddScoped<IBasketRepository, BasketRepository>();
+services.Decorate<IBasketRepository, CachedBasketRepository>();
+services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnectionString;
+});
+
+
+
+
+
+
+
+
+
 
 var app = builder.Build();
 
