@@ -10,6 +10,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_catalog:/var/lib/postgresql/data
+  
+
   basketdb:
     container_name: basketdb
     environment:
@@ -22,6 +24,31 @@ services:
     volumes:
       - postgres_basket:/var/lib/postgresql/data
   
+
+  orderdb:
+    container_name: orderdb
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Password123
+    restart: always
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_order:/var/opt/mssql
+  
+
+  messagebroker:
+    container_name: messagebroker
+    hostname: ecommerce-mq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    restart: always
+
+
   distributedcache:
     container_name: distributedcache
     image: redis
@@ -44,6 +71,7 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
 
+
   basket.api:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -51,6 +79,10 @@ services:
       - ASPNETCORE_HTTPS_PORTS=8081
       - ConnectionStrings__Database=Server=basketdb;Port=5432;Database=BasketDb;Username=postgres;Password=postgres;Include Error Detail=true
       - ConnectionStrings__Redis=distributedcache:6379
+      - GrpcConfigs__DiscountUrl=http://discount.grpc:8080
+      - MessageBroker__Host=amqp://ecommerce-mq:5672
+      - MessageBroker__UserName=guest
+      - MessageBroker__Password=guest
     depends_on:
       - basketdb
       - distributedcache
@@ -61,6 +93,7 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro  
   
+
   discount.grpc:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -70,6 +103,49 @@ services:
     ports:
       - "6002:8080"
       - "6062:8081"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+
+
+  ordering.api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+      - ConnectionStrings__Database=Server=orderdb;Database=OrderDb;User Id=sa;Password=Password123;Encrypt=False;MultipleActiveResultSets=True;TrustServerCertificate=True
+      - MessageBroker__Host=amqp://ecommerce-mq:5672
+      - MessageBroker__UserName=guest
+      - MessageBroker__Password=guest
+      - FeatureManagement__OrderFulfillment=false
+    depends_on:
+      - orderdb
+      - messagebroker
+    ports:
+      - "6003:8080"
+      - "6063:8081"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro  
+  
+
+  yarpapigateway:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ASPNETCORE_HTTPS_PORTS=8081
+      - ReverseProxy__Clusters__catalog-claster__Destinations__0__Address=http://catalog.api:8080/products
+      - ReverseProxy__Clusters__basket-claster__Destinations__0__Address=http://basket.api:8080/basket
+      - ReverseProxy__Clusters__discount-claster__Destinations__0__Address=http://discount.grpc:8080/discount
+      - ReverseProxy__Clusters__ordering-claster__Destinations__0__Address=http://ordering.api:8080/orders
+    depends_on:
+      - catalog.api
+      - basket.api
+      - discount.grpc
+      - ordering.api
+    ports:
+      - "6004:8080"
+      - "6064:8081"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro

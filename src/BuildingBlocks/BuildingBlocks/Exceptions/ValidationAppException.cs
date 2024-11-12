@@ -4,20 +4,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BuildingBlocks.Exceptions
+namespace BuildingBlocks.Exceptions;
+
+public class ValidationAppException(Dictionary<string, string[]> errors)
+    : Exception("One or more validation failures have occurred.")
 {
-    public class ValidationAppException(Dictionary<string, string[]> errors)
-        : Exception("One or more validation failures have occurred.")
+    public Dictionary<string, string[]> Errors { get; } = errors;
+
+    public static void ThrowIfError(Dictionary<string, string[]> errors)
     {
-        public Dictionary<string, string[]> Errors { get; } = errors;
-
-        public static void ThrowIfError(Dictionary<string, string[]> errors)
+        if (errors.Count > 0)
         {
-            if (errors.Count > 0)
-            {
-                throw new ValidationAppException(errors);
-            }
+            throw new ValidationAppException(errors);
         }
-
     }
+
 }

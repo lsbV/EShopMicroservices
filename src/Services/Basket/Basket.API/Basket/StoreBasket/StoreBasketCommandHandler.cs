@@ -1,5 +1,6 @@
 ﻿using Basket.API.Data;
 using Basket.API.Infrastructure.Exceptions;
+using Discount.Grpc;
 using FluentValidation;
 
 namespace Basket.API.Basket.StoreBasket;
@@ -20,22 +21,23 @@ public class StoreBasketCommandValidator : AbstractValidator<StoreBasketCommand>
     }
 }
 
-public class StoreBasketCommandHandler(IBasketRepository repository, IMapper mapper)
+public class StoreBasketCommandHandler(IBasketRepository repository, DiscountProtoService.DiscountProtoServiceClient discountProtoService)
     : ICommandHandler<StoreBasketCommand, StoreBasketResult>
 {
     public async Task<StoreBasketResult> Handle(StoreBasketCommand request, CancellationToken cancellationToken)
     {
-        try
+        await ApplyDiscount(request.Cart, cancellationToken);
+        await repository.UpdateBasketAsync(request.Cart, cancellationToken);
+        return new StoreBasketResult(request.Cart.UserName);
+    }
+
+    private async Task ApplyDiscount(ShoppingCart cart, CancellationToken cancellationToken)
+    {
+        foreach (var item in cart.Items)
         {
-            var cart = await repository.GetBasketAsync(request.Cart.UserName, cancellationToken);
-            cart.Items = request.Cart.Items;
-            await repository.UpdateBasketAsync(cart, cancellationToken);
-            return new StoreBasketResult(request.Cart.UserName);
-        }
-        catch (BasketNotFoundException)
-        {
-            await repository.UpdateBasketAsync(request.Cart, cancellationToken);
-            return new StoreBasketResult(request.Cart.UserName);
+            var discount = await discountProtoService.GetDiscountAsync(new GetDiscountRequest { ProductName = item.ProductName }, cancellationToken: cancellationToken);
+            item.Price -= discount.Amount;
         }
     }
+
 }
